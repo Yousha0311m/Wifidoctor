@@ -1,10 +1,10 @@
-// CommandPalette.tsx | SignalFLoor | Global Ctrl+K fuzzy command center with staggered scan autofill
+// CommandPalette.tsx | SignalFLoor | Global command palette (Ctrl+K) for navigation, themes, exports and resets
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
-  Camera,
+  Bluetooth,
   Command,
   Database,
   Download,
@@ -13,10 +13,8 @@ import {
   Gauge,
   LayoutDashboard,
   Map as MapIcon,
-  Navigation,
   Radar,
   SlidersHorizontal,
-  Smartphone,
   Sparkles,
   Trash2,
   Volume2,
@@ -62,12 +60,12 @@ export default function CommandPalette({
   open,
   onClose,
   onOpenFxStudio,
-  onOpenPhone,
+  onOpenDevice,
 }: {
   open: boolean
   onClose: () => void
   onOpenFxStudio: () => void
-  onOpenPhone: () => void
+  onOpenDevice: () => void
 }) {
   const navigate = useNavigate()
   const { rooms, clearRooms } = useFloor()
@@ -130,24 +128,10 @@ export default function CommandPalette({
     return [
       { id: 'nav-dash', title: 'Go to Dashboard', sub: 'Signal telemetry & floor overview', hint: 'Nav', icon: LayoutDashboard, run: () => navigate('/') },
       { id: 'nav-floor', title: 'Go to Floor Plans', sub: 'Draw rooms, resize walls & place router', hint: 'Nav', icon: MapIcon, run: () => navigate('/floor-plans') },
-      { id: 'nav-scans', title: 'Go to Scans & Live Navigate', sub: 'Walk to scan spots with live guidance & capture points', hint: 'Nav', icon: Navigation, run: () => navigate('/scans?companion=1') },
-      { id: 'phone-lan', title: 'Connect Phone on Same Wi-Fi (QR Bridge)', sub: 'Open QR code, LAN IP URLs & PC-Phone live sync', hint: 'LAN', icon: Smartphone, run: onOpenPhone },
-      { id: 'cam-scan', title: 'Open Floor Plans & Camera Room Scanner', sub: 'Measure room dimensions with camera reticle or laser trig', hint: 'Camera', icon: Camera, run: () => navigate('/floor-plans') },
-      {
-        id: 'host-wifi',
-        title: settings.scanSource === 'host-wifi' ? 'Switch Scans to RF Simulator' : 'Use Live Host Windows Wi-Fi (netsh)',
-        sub: 'Read real OS signal strength during scans',
-        hint: 'Wi-Fi',
-        icon: Radar,
-        run: () => {
-          const next = settings.scanSource === 'host-wifi' ? 'simulator' : 'host-wifi'
-          updateSettings({ scanSource: next, espConnected: false })
-          toast(next === 'host-wifi' ? 'Host Wi-Fi scanner active.' : 'Switched back to RF simulator.', 'info')
-        },
-      },
+      { id: 'nav-scans', title: 'Go to Scans', sub: 'Capture signal readings at spots on your floor plan', hint: 'Nav', icon: Radar, run: () => navigate('/scans') },
       { id: 'nav-heat', title: 'Go to Heatmap', sub: 'IDW interpolated signal strength & point probe', hint: 'Nav', icon: Flame, run: () => navigate('/heatmap') },
       { id: 'nav-rep', title: 'Go to Reports', sub: 'Dead zones, extender placement & charts', hint: 'Nav', icon: FileText, run: () => navigate('/reports') },
-      { id: 'nav-util', title: 'Go to Wi-Fi Utilities & Channel Advisor', sub: 'Ping, latency, speed test, uptime & least-traffic channels', hint: 'Tools', icon: Gauge, run: () => navigate('/utilities') },
+      { id: 'nav-util', title: 'Go to Wi-Fi Utilities', sub: 'Nearby networks, channel congestion & best channel', hint: 'Tools', icon: Gauge, run: () => navigate('/utilities') },
       {
         id: 'demo',
         title: 'Load Demo Home (6 Rooms + 13 Scans)',
@@ -160,16 +144,17 @@ export default function CommandPalette({
         },
       },
       { id: 'autofill', title: 'Auto-Fill Remaining Scan Spots', sub: 'Sweep all uncovered grid spots across current rooms', hint: 'Scan', icon: Activity, run: autoFillRemaining },
+      { id: 'device', title: 'Connect ESP32 over Bluetooth', sub: 'Send Wi-Fi and broker settings to the device', hint: 'Device', icon: Bluetooth, run: onOpenDevice },
       {
         id: 'esp',
-        title: settings.espConnected ? 'Disconnect ESP32 Hardware' : 'Connect ESP32 Hardware Bridge',
-        sub: `Active SSID: ${settings.espSsid}`,
+        title: settings.scanSource === 'esp32' ? 'Use RF Simulator for Scans' : 'Use ESP32 for Scans',
+        sub: settings.scanSource === 'esp32' ? 'Currently reading from the ESP32 scanner' : 'Currently using the built-in simulator',
         hint: 'Device',
         icon: Wifi,
         run: () => {
-          const next = !settings.espConnected
-          updateSettings({ espConnected: next })
-          toast(next ? `ESP32 telemetry armed (${settings.espSsid}).` : 'Switched back to built-in RF simulator.', next ? 'success' : 'info')
+          const next = settings.scanSource === 'esp32' ? 'simulator' : 'esp32'
+          updateSettings({ scanSource: next })
+          toast(next === 'esp32' ? 'Scans now come from the ESP32.' : 'Switched to the RF simulator.', 'info')
         },
       },
       { id: 'fx-studio', title: 'Open UI Themes & FX Studio', sub: 'Switch Neumorphism, Liquid Glass, Obsidian Classic & Audio', hint: 'Studio', icon: SlidersHorizontal, run: onOpenFxStudio },
@@ -246,7 +231,7 @@ export default function CommandPalette({
         },
       },
     ]
-  }, [clear, clearRooms, navigate, onOpenFxStudio, onOpenPhone, points, rooms, setPoints, settings.audioEnabled, settings.espConnected, settings.espSsid, settings.fxPreset, settings.routerPos, settings.scanSource, updateSettings])
+  }, [clear, clearRooms, navigate, onOpenDevice, onOpenFxStudio, points, rooms, setPoints, settings.audioEnabled, settings.espSsid, settings.fxPreset, settings.routerPos, settings.scanSource, updateSettings])
 
   const filtered = useMemo(() => {
     const q = query.trim()

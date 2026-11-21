@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { Crosshair, MapPin } from 'lucide-react'
 import FloorMap from '@/components/floorplan/FloorMap'
 import Legend from '@/components/floorplan/Legend'
+import { Segmented, type SegOption } from '@/components/ui/Kit'
 import { useFloor } from '@/hooks/useFloor'
 import { useScan } from '@/hooks/useScan'
-import { useSettings } from '@/hooks/useSettings'
+import { useSettings, type ScanSource } from '@/hooks/useSettings'
 import { getRouterPos, simulateScan } from '@/lib/scanner'
 import { postScan, wsUrl } from '@/lib/api'
 import { inRoom } from '@/lib/analytics'
@@ -13,15 +14,15 @@ import { suggestSpots, nextSpot } from '@/lib/spots'
 import { levelText, signalLevel } from '@/lib/signal'
 import type { ScanPoint } from '@/types'
 
-const SOURCE_LABEL: Record<string, string> = {
-  simulator: 'Simulator',
-  esp32: 'ESP32',
-}
+const SOURCE_OPTIONS: SegOption<ScanSource>[] = [
+  { value: 'simulator', label: 'Simulator' },
+  { value: 'esp32', label: 'ESP32' },
+]
 
 export default function Scans() {
   const { rooms } = useFloor()
   const { points, addPoint, clear } = useScan()
-  const { settings } = useSettings()
+  const { settings, updateSettings } = useSettings()
   const [pending, setPending] = useState<{ x: number; y: number } | null>(null)
   const [scanning, setScanning] = useState(false)
   const timeoutRef = useRef<number | null>(null)
@@ -145,9 +146,11 @@ export default function Scans() {
             )}
           </p>
           <div className="sm:ml-auto flex items-center gap-3">
-            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border border-line text-muted">
-              {SOURCE_LABEL[settings.scanSource] ?? settings.scanSource}
-            </span>
+            <Segmented
+              options={SOURCE_OPTIONS}
+              value={settings.scanSource}
+              onChange={v => updateSettings({ scanSource: v })}
+            />
             <Legend />
           </div>
         </div>

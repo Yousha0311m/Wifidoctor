@@ -1,8 +1,9 @@
-// Topbar.tsx | SignalFLoor | Streamlined 44px header bar with UI Theme pill, Phone LAN Bridge, audio & theme toggle
+// Topbar.tsx | SignalFLoor | Header bar with UI theme pill, command palette, audio & theme toggle
 import { useLocation } from 'react-router-dom'
-import { Command, Palette, Smartphone, Volume2, VolumeX } from 'lucide-react'
+import { Bluetooth, BluetoothConnected, Command, Palette, Volume2, VolumeX } from 'lucide-react'
 import { BrandMark } from '@/components/ui/Kit'
 import { useFloor } from '@/hooks/useFloor'
+import { useHardware } from '@/hooks/useHardware'
 import { useScan } from '@/hooks/useScan'
 import { UI_STYLES, useSettings } from '@/hooks/useSettings'
 import { sound } from '@/lib/sounds'
@@ -11,25 +12,26 @@ import ThemeToggle from './ThemeToggle'
 const ROUTE_SUB: Record<string, string> = {
   '/': 'Wi-Fi Telemetry Studio',
   '/floor-plans': 'Spatial Floor Builder',
-  '/scans': 'Signal Capture & Live Navigate',
-  '/heatmap': 'IDW Attenuation Field',
+  '/scans': 'Signal Capture',
+  '/heatmap': 'Signal Heatmap',
   '/reports': 'Dead-Zone Diagnostics',
-  '/utilities': 'Ping, Speed, Uptime & Channels',
+  '/utilities': 'Channels & Nearby Networks',
 }
 
 export default function Topbar({
   onOpenCommand,
   onOpenThemeStudio,
-  onOpenPhone,
+  onOpenDevice,
 }: {
   onOpenCommand: () => void
   onOpenThemeStudio: () => void
-  onOpenPhone: () => void
+  onOpenDevice: () => void
 }) {
   const { pathname } = useLocation()
   const { rooms } = useFloor()
   const { points } = useScan()
   const { settings, updateSettings } = useSettings()
+  const device = useHardware()
 
   const avg = points.length ? Math.round(points.reduce((s, p) => s + p.rssi, 0) / points.length) : null
   const activeStyle = UI_STYLES[settings.uiStyle] ?? UI_STYLES.neumorphism
@@ -48,12 +50,13 @@ export default function Topbar({
           className="tb-pill interactive"
           onClick={() => {
             sound.click()
-            onOpenPhone()
+            onOpenDevice()
           }}
-          title="Connect Phone on Same Wi-Fi (QR Code & LAN Sync)"
+          title={device.connected ? `Connected: ${device.deviceName}` : 'Connect the ESP32 over Bluetooth'}
         >
-          <Smartphone size={13} />
-          <span className="hidden md:inline">Phone / LAN</span>
+          {device.connected ? <BluetoothConnected size={13} /> : <Bluetooth size={13} />}
+          <span className={`conn-dot ${device.connected ? 'ok' : ''}`} />
+          <span className="hidden md:inline">{device.connected ? 'Device' : 'Connect'}</span>
         </button>
 
         <button

@@ -3,7 +3,8 @@ WiFiDoctor Phase A backend.
 
 Subscribes to MQTT (devices/esp32-01/scan + /status), pairs incoming scans
 with the (x, y) of the last POST /scan request, stores points in memory,
-broadcasts them via WebSocket to any connected browser.
+broadcasts them via WebSocket to any connected browser. Each stored point keeps the
+full nearby-networks list (ssid, bssid, rssi, channel) so the dashboard can show channel congestion.
 
 No database, no auth, no persistence. All of that is Phase B.
 """
@@ -84,12 +85,22 @@ async def handle_scan(payload: str) -> None:
     else:
         x, y = pending["x"], pending["y"]
 
-    networks = data.get("networks", [])
+    raw_networks = data.get("networks", [])
+    networks = [
+        {
+            "ssid": n.get("ssid", ""),
+            "bssid": n.get("bssid", ""),
+            "rssi": n["rssi"],
+            "channel": n.get("channel"),
+        }
+        for n in raw_networks
+        if isinstance(n, dict) and isinstance(n.get("rssi"), (int, float))
+    ]
     if not networks:
-        print("[scan] empty networks array, nothing to store")
+        print("[scan] no usable networks in payload, nothing to store")
         return
 
-    strongest = networks[0]
+    strongest = max(networks, key=lambda n: n["rssi"])
     point = {
         "id": int(datetime.now(timezone.utc).timestamp() * 1000),
         "x": x,
@@ -97,6 +108,8 @@ async def handle_scan(payload: str) -> None:
         "rssi": strongest["rssi"],
         "ssid": strongest["ssid"],
         "bssid": strongest["bssid"],
+        "channel": strongest["channel"],
+        "networks": networks,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     scan_points.append(point)

@@ -1,12 +1,12 @@
-// AppLayout.tsx | SignalFLoor | Multi-theme responsive shell layout (titlebar + sidebar + main + studios + LAN phone modal)
+// AppLayout.tsx | SignalFLoor | Multi-theme responsive shell layout (titlebar + sidebar + main + studios)
 
 import { useEffect, useState, type ReactNode } from 'react'
 import FxCanvas from '@/components/fx/FxCanvas'
 import { ToastContainer } from '@/components/ui/Kit'
 import { useSettings } from '@/hooks/useSettings'
 import CommandPalette from './CommandPalette'
+import ConnectDeviceModal from './ConnectDeviceModal'
 import FxStudioModal from './FxStudioModal'
-import PhoneConnectModal from './PhoneConnectModal'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 
@@ -14,7 +14,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   useSettings()
   const [cmdOpen, setCmdOpen] = useState(false)
   const [fxOpen, setFxOpen] = useState(false)
-  const [phoneOpen, setPhoneOpen] = useState(false)
+  const [deviceOpen, setDeviceOpen] = useState(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -33,7 +33,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <Topbar
         onOpenCommand={() => setCmdOpen(true)}
         onOpenThemeStudio={() => setFxOpen(true)}
-        onOpenPhone={() => setPhoneOpen(true)}
+        onOpenDevice={() => setDeviceOpen(true)}
       />
       <div className="shell">
         <Sidebar onOpenFxStudio={() => setFxOpen(true)} />
@@ -45,10 +45,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         open={cmdOpen}
         onClose={() => setCmdOpen(false)}
         onOpenFxStudio={() => setFxOpen(true)}
-        onOpenPhone={() => setPhoneOpen(true)}
+        onOpenDevice={() => setDeviceOpen(true)}
       />
       <FxStudioModal open={fxOpen} onClose={() => setFxOpen(false)} />
-      <PhoneConnectModal open={phoneOpen} onClose={() => setPhoneOpen(false)} />
+      <ConnectDeviceModal open={deviceOpen} onClose={() => setDeviceOpen(false)} />
       <ToastContainer />
     </>
   )

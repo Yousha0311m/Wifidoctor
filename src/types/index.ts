@@ -1,4 +1,4 @@
-// index.ts | SignalFLoor | Shared domain interfaces for rooms, Wi-Fi scans, live operator telemetry & distance ruler
+// index.ts | SignalFLoor | Shared domain interfaces for rooms and Wi-Fi scans
 
 export interface Room {
   id: string
@@ -9,6 +9,14 @@ export interface Room {
   h: number
 }
 
+// One network heard during a scan (the ESP32 reports the strongest 15 each time)
+export interface NearbyNetwork {
+  ssid: string
+  bssid: string
+  rssi: number
+  channel: number
+}
+
 export interface ScanPoint {
   id: number
   x: number
@@ -17,22 +25,6 @@ export interface ScanPoint {
   ssid: string
   bssid: string
   timestamp: string // ISO string
-}
-
-export interface OperatorTelemetry {
-  x: number
-  y: number
-  heading: number // degrees 0..360 (0 = North/Up, 90 = East/Right)
-  stepCount: number
-  strideMeters: number
-  autoCapture: boolean
-  deviceName: string
-  updatedAt: string
-}
-
-export interface RulerMeasurement {
-  x1: number
-  y1: number
-  x2: number
-  y2: number
+  channel?: number
+  networks?: NearbyNetwork[]
 }

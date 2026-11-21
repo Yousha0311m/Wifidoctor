@@ -1,4 +1,4 @@
-// useSettings.ts | SignalFLoor | Persisted Multi-UI Theme, FX Physics, Audio & ESP32 Settings Hook
+// useSettings.ts | SignalFLoor | Persisted UI theme, FX, audio and scan-source settings hook
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { sound, type AudioPreset } from '@/lib/sounds'
@@ -84,7 +84,7 @@ export const ACCENT_PRESETS: Record<AccentPreset, { label: string; hex: string; 
   crimson: { label: 'Crimson Probe', hex: '#f87171', lightHex: '#dc2626', hue: 356, sat: 84 },
 }
 
-export type ScanSource = 'simulator' | 'host-wifi' | 'esp32'
+export type ScanSource = 'simulator' | 'esp32'
 
 export interface SignalSettings {
   uiStyle: UiStyle
@@ -95,7 +95,6 @@ export interface SignalSettings {
   audioPreset: AudioPreset
   audioVolume: number
   audioHoverTicks: boolean
-  espConnected: boolean
   scanSource: ScanSource
   espSsid: string
   routerPos: { x: number; y: number } | null
@@ -113,7 +112,6 @@ const DEFAULT_SETTINGS: SignalSettings = {
   audioPreset: 'tactical',
   audioVolume: 0.35,
   audioHoverTicks: false,
-  espConnected: false,
   scanSource: 'simulator',
   espSsid: 'HomeNet',
   routerPos: null,
@@ -124,11 +122,12 @@ function load(): SignalSettings {
     const raw = localStorage.getItem(KEY)
     if (!raw) return DEFAULT_SETTINGS
     const parsed = JSON.parse(raw) as Partial<SignalSettings>
-    const inferredSource: ScanSource = parsed.scanSource ?? (parsed.espConnected ? 'esp32' : 'simulator')
+    // older saves may hold the removed 'host-wifi' source
+    const source: ScanSource = parsed.scanSource === 'esp32' ? 'esp32' : 'simulator'
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      scanSource: inferredSource,
+      scanSource: source,
       uiStyle: parsed.uiStyle && parsed.uiStyle in UI_STYLES ? parsed.uiStyle : DEFAULT_SETTINGS.uiStyle,
     }
   } catch {
