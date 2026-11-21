@@ -1,7 +1,6 @@
-// FloorPlans.tsx | SignalFLoor | Interactive floorplan builder with continuous draw, quick stamps & router pin
-import { useCallback, useEffect, useMemo, useState } from 'react'
+// FloorPlans.tsx | SignalFLoor | Floorplan builder: continuous draw, quick stamps, router pin (touch friendly)
+import { useCallback, useEffect, useState } from 'react'
 import {
-  Camera,
   Copy,
   Database,
   Map as MapIcon,
@@ -9,47 +8,50 @@ import {
   Plus,
   RotateCcw,
   Router,
-  Ruler,
   Square,
   Trash2,
 } from 'lucide-react'
-import CameraScannerModal from '@/components/floorplan/CameraScannerModal'
 import FloorPlanCanvas, { type Mode } from '@/components/floorplan/FloorPlanCanvas'
 import { Badge, Button, ConfirmDialog, GlassCard, Segmented, type SegOption } from '@/components/ui/Kit'
 import { useFloor } from '@/hooks/useFloor'
 import { useSettings } from '@/hooks/useSettings'
-import { measureSpan } from '@/lib/analytics'
 import { CANVAS_H, CANVAS_W, clamp, snap } from '@/lib/floor'
 import { ROOMS } from '@/lib/mock'
 import { getRouterPos } from '@/lib/scanner'
 import { sound } from '@/lib/sounds'
 import { toast } from '@/lib/toast'
-import type { Room, RulerMeasurement } from '@/types'
+import type { Room } from '@/types'
 
 const NAME_PRESETS = ['Living Room', 'Bedroom', 'Kitchen', 'Study', 'Hall', 'Bath', 'Office', 'Garage']
 
 interface QuickPreset {
   name: string
-  wM: number
-  hM: number
+  w: number
+  h: number
   label: string
 }
 
+// Sizes are canvas pixels (the canvas is 1000 x 600)
 const QUICK_PRESETS: QuickPreset[] = [
-  { name: 'Living Room', wM: 5.0, hM: 4.0, label: 'Living (5×4m)' },
-  { name: 'Bedroom', wM: 4.0, hM: 3.5, label: 'Bedroom (4×3.5m)' },
-  { name: 'Kitchen', wM: 3.5, hM: 3.0, label: 'Kitchen (3.5×3m)' },
-  { name: 'Bathroom', wM: 2.5, hM: 2.0, label: 'Bath (2.5×2m)' },
-  { name: 'Office', wM: 3.0, hM: 2.5, label: 'Office (3×2.5m)' },
-  { name: 'Hallway', wM: 4.0, hM: 1.5, label: 'Hall (4×1.5m)' },
+  { name: 'Living Room', w: 250, h: 200, label: 'Living' },
+  { name: 'Bedroom', w: 200, h: 180, label: 'Bedroom' },
+  { name: 'Kitchen', w: 170, h: 150, label: 'Kitchen' },
+  { name: 'Bathroom', w: 120, h: 100, label: 'Bath' },
+  { name: 'Office', w: 150, h: 120, label: 'Office' },
+  { name: 'Hallway', w: 200, h: 80, label: 'Hall' },
 ]
 
 const MODE_OPTIONS: SegOption<Mode>[] = [
-  { value: 'draw', label: 'Draw room (D)', icon: <Square size={14} /> },
-  { value: 'select', label: 'Select & resize (V)', icon: <MousePointer2 size={14} /> },
-  { value: 'router', label: 'Place router (R)', icon: <Router size={14} /> },
-  { value: 'ruler', label: 'Measure (M)', icon: <Ruler size={14} /> },
+  { value: 'draw', label: 'Draw', icon: <Square size={14} /> },
+  { value: 'select', label: 'Select', icon: <MousePointer2 size={14} /> },
+  { value: 'router', label: 'Router', icon: <Router size={14} /> },
 ]
+
+const MODE_HINT: Record<Mode, string> = {
+  draw: 'Drag on the canvas to add a room. Keep drawing to add more.',
+  select: 'Tap a room to select it. Drag to move, drag the handles to resize.',
+  router: 'Tap the canvas to place the router.',
+}
 
 export default function FloorPlans() {
   const { rooms, setRooms, addRoom, updateRoom, removeRoom, clearRooms } = useFloor()
@@ -58,31 +60,12 @@ export default function FloorPlans() {
   const [mode, setMode] = useState<Mode>('draw')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
-  const [cameraOpen, setCameraOpen] = useState(false)
-  const [ruler, setRuler] = useState<RulerMeasurement | null>(null)
 
   const selected = rooms.find(r => r.id === selectedId) ?? null
   const activeRouter = getRouterPos(rooms, settings.routerPos)
 
-  const rulerMetrics = useMemo(() => {
-    if (!ruler || Math.hypot(ruler.x2 - ruler.x1, ruler.y2 - ruler.y1) < 4) return null
-    return measureSpan(ruler.x1, ruler.y1, ruler.x2, ruler.y2, rooms)
-  }, [ruler, rooms])
-
-  const handleCameraAddRoom = (name: string, widthMeters: number, depthMeters: number) => {
-    const w = Math.max(80, Math.min(CANVAS_W - 80, Math.round((widthMeters * 50) / 10) * 10))
-    const h = Math.max(80, Math.min(CANVAS_H - 80, Math.round((depthMeters * 50) / 10) * 10))
-    const maxRight = rooms.reduce((m, r) => Math.max(m, r.x + r.w), 80)
-    const x = maxRight + w <= CANVAS_W - 40 ? maxRight : 80
-    const y = maxRight + w <= CANVAS_W - 40 ? 80 : 320
-    const id = addRoom({ name, x, y, w, h })
-    setSelectedId(id)
-    toast(`Added camera-scanned "${name}" (${widthMeters.toFixed(1)}×${depthMeters.toFixed(1)}m).`, 'success')
-  }
-
   const handleQuickAdd = (preset: QuickPreset) => {
-    const w = Math.round(preset.wM * 50)
-    const h = Math.round(preset.hM * 50)
+    const { w, h } = preset
     let x = 60
     let y = 60
 
@@ -104,7 +87,7 @@ export default function FloorPlans() {
     const id = addRoom({ name, x, y, w, h })
     setSelectedId(id)
     sound.success()
-    toast(`Added "${name}" (${preset.wM}×${preset.hM}m). Click handles to resize or drag to position.`, 'success')
+    toast(`Added "${name}". Switch to Select to move or resize it.`, 'success')
   }
 
   const handleDuplicate = useCallback(
@@ -130,7 +113,7 @@ export default function FloorPlans() {
     toast('Room removed.', 'info')
   }
 
-  // Keyboard navigation & blueprint shortcuts
+  // Keyboard shortcuts (desktop only)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
@@ -151,7 +134,6 @@ export default function FloorPlans() {
         return
       }
 
-      // Duplicate shortcut Ctrl+D
       if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
         if (selected) {
           e.preventDefault()
@@ -160,25 +142,19 @@ export default function FloorPlans() {
         return
       }
 
-      // Tool switching
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key === 'd' || e.key === 'D') {
           e.preventDefault()
           setMode('draw')
-          toast('Draw tool active — drag on canvas to create rooms.', 'info')
         } else if (e.key === 'v' || e.key === 'V' || e.key === 's' || e.key === 'S') {
           e.preventDefault()
           setMode('select')
         } else if (e.key === 'r' || e.key === 'R') {
           e.preventDefault()
           setMode('router')
-        } else if (e.key === 'm' || e.key === 'M') {
-          e.preventDefault()
-          setMode('ruler')
         }
       }
 
-      // Arrow keys to nudge selected room
       if (selected && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault()
         const step = e.shiftKey ? 50 : 10
@@ -196,19 +172,14 @@ export default function FloorPlans() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedId, selected, removeRoom, updateRoom, handleDuplicate])
 
-  const totalSqm = rooms.reduce((s, r) => s + (r.w / 50) * (r.h / 50), 0)
-
   return (
     <>
       <div className="view-head">
         <div>
           <h1>Floor Plans</h1>
-          <p>Draw continuous rooms on the 10px snap grid, stamp quick presets, or pin your Wi-Fi router.</p>
+          <p>Draw rooms on the snap grid, stamp quick presets, or pin your Wi-Fi router.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" onClick={() => setCameraOpen(true)}>
-            <Camera size={14} /> Scan Room (Camera)
-          </Button>
           <Button
             size="sm"
             onClick={() => {
@@ -231,46 +202,22 @@ export default function FloorPlans() {
       <div className="toolbar glass">
         <div className="tb-row">
           <Segmented options={MODE_OPTIONS} value={mode} onChange={setMode} />
-
-          <div className="ml-auto flex items-center gap-2 text-xs text-[var(--text-3)] flex-wrap">
-            {mode === 'ruler' ? (
-              <>
-                {rulerMetrics ? (
-                  <span className="font-mono text-[var(--text)]">
-                    {rulerMetrics.meters.toFixed(2)}m · {rulerMetrics.steps} steps · {rulerMetrics.wallsCrossed} wall(s) · -{rulerMetrics.estLossDb} dB loss
-                  </span>
-                ) : (
-                  <span>Drag or tap two points to measure distance &amp; wall loss</span>
-                )}
-                {ruler && (
-                  <Button size="sm" variant="ghost" onClick={() => setRuler(null)}>
-                    Clear
-                  </Button>
-                )}
-              </>
-            ) : (
-              <span className="font-mono hidden sm:inline">
-                {mode === 'draw'
-                  ? 'Continuous Draw active · drag to add rooms · press V to select'
-                  : mode === 'router'
-                    ? 'Click anywhere to position router origin'
-                    : 'Drag room to move · handles to resize · Arrows to nudge · Del to delete'}
-              </span>
-            )}
-          </div>
+          <p className="text-xs text-[var(--text-3)] basis-full sm:basis-0 sm:flex-1 sm:text-right">
+            {MODE_HINT[mode]}
+          </p>
         </div>
 
         {/* Quick Room Stamper Bar */}
         <div className="flex items-center gap-1.5 pt-2 border-t border-[var(--edge)] overflow-x-auto text-xs">
           <span className="text-[var(--text-3)] font-semibold uppercase text-[10px] tracking-wider shrink-0 mr-1">
-            Quick Add:
+            Quick Add
           </span>
           {QUICK_PRESETS.map(p => (
             <button
               key={p.name}
               type="button"
               onClick={() => handleQuickAdd(p)}
-              className="chip hover:border-[var(--edge-strong)] cursor-pointer shrink-0 transition-colors inline-flex items-center gap-1"
+              className="chip hover:border-[var(--edge-strong)] cursor-pointer shrink-0 transition-colors inline-flex items-center gap-1 !h-8 sm:!h-[22px]"
             >
               <Plus size={11} />
               <span>{p.label}</span>
@@ -283,7 +230,7 @@ export default function FloorPlans() {
         <GlassCard
           eyebrow="Canvas"
           title="Spatial Layout Editor"
-          sub={`${rooms.length} room(s) · ${totalSqm.toFixed(1)} m² total`}
+          sub={`${rooms.length} room${rooms.length === 1 ? '' : 's'}`}
           icon={<MapIcon size={17} />}
         >
           <FloorPlanCanvas
@@ -291,16 +238,15 @@ export default function FloorPlans() {
             selectedId={selectedId}
             mode={mode}
             routerPos={rooms.length > 0 || settings.routerPos ? activeRouter : null}
-            ruler={ruler}
-            onSelect={id => {
-              // Select room for inspection, but do NOT kick out of draw mode if drawing!
-              setSelectedId(id)
-            }}
+            onSelect={setSelectedId}
             onAdd={rect => {
-              sound.success()
               const id = addRoom(rect)
               setSelectedId(id)
-              toast('Room added! Drag again to add another room, or press V to select.', 'success')
+              try {
+                sound.success()
+              } catch {
+                // audio is optional, never block adding a room
+              }
               return id
             }}
             onUpdate={updateRoom}
@@ -310,20 +256,18 @@ export default function FloorPlans() {
               setMode('select')
               toast(`Router pinned at (${pos.x}, ${pos.y}).`, 'success')
             }}
-            onRulerChange={setRuler}
           />
         </GlassCard>
 
-        {/* Unified Layout & Inspector Panel */}
+        {/* Inspector & room list */}
         <div className="flex flex-col gap-3.5">
-          {/* Active Room Inspector */}
           {selected ? (
             <GlassCard
               eyebrow="Inspector"
               title={selected.name}
               action={
                 <Badge tone="neutral">
-                  {(selected.w / 50).toFixed(1)}×{(selected.h / 50).toFixed(1)}m
+                  {selected.w}×{selected.h}
                 </Badge>
               }
             >
@@ -354,16 +298,16 @@ export default function FloorPlans() {
 
                 <div className="text-xs text-[var(--text-3)] font-mono flex justify-between pt-1 border-t border-[var(--edge)]">
                   <span>
-                    Area: {(((selected.w / 50) * selected.h) / 50).toFixed(1)} m²
+                    Size: {selected.w}×{selected.h}
                   </span>
                   <span>
                     Pos: ({selected.x}, {selected.y})
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
                   <Button size="sm" onClick={() => handleDuplicate(selected)}>
-                    <Copy size={13} /> Duplicate (Ctrl+D)
+                    <Copy size={13} /> Duplicate
                   </Button>
                   <Button variant="danger" size="sm" onClick={() => remove(selected.id)}>
                     <Trash2 size={13} /> Delete
@@ -377,26 +321,22 @@ export default function FloorPlans() {
           ) : (
             <GlassCard eyebrow="Inspector" title="Room Details">
               <p className="text-xs text-[var(--text-3)] leading-relaxed">
-                Click any room on the canvas to inspect dimensions, rename, duplicate, or delete.
+                Select a room to rename, duplicate or delete it.
               </p>
             </GlassCard>
           )}
 
           {/* Rooms Inventory */}
-          <GlassCard
-            eyebrow="Layout"
-            title={`Rooms (${rooms.length})`}
-            action={<Badge tone="neutral">{totalSqm.toFixed(1)} m²</Badge>}
-          >
+          <GlassCard eyebrow="Layout" title={`Rooms (${rooms.length})`}>
             {rooms.length === 0 ? (
               <div className="text-xs text-[var(--text-3)] flex flex-col gap-3 py-2">
-                <p>No rooms created yet. Use Quick Add above, drag on the canvas, or load a sample house.</p>
+                <p>No rooms yet. Use Quick Add, drag on the canvas, or load a sample house.</p>
                 <Button
                   size="sm"
                   variant="primary"
                   onClick={() => {
                     setRooms(ROOMS)
-                    toast('Sample 6-room home loaded.', 'success')
+                    toast('Sample home loaded.', 'success')
                   }}
                 >
                   Load Sample Layout
@@ -420,7 +360,7 @@ export default function FloorPlans() {
                     >
                       <span className="truncate font-medium text-[var(--text)]">{r.name}</span>
                       <span className="font-mono text-[11px] text-[var(--text-3)]">
-                        {(r.w / 50).toFixed(1)}×{(r.h / 50).toFixed(1)}m
+                        {r.w}×{r.h}
                       </span>
                     </button>
                     <button
@@ -430,17 +370,17 @@ export default function FloorPlans() {
                         remove(r.id)
                       }}
                       title="Remove room"
-                      className="p-1.5 text-[var(--text-3)] hover:text-[var(--err-text)] rounded-[6px] transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-2 text-[var(--text-3)] hover:text-[var(--err-text)] rounded-[6px] transition-colors md:opacity-0 md:group-hover:opacity-100"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                     </button>
                   </li>
                 ))}
               </ul>
             )}
 
-            {/* Router status inline footer */}
-            <div className="mt-3 pt-3 border-t border-[var(--edge)] flex items-center justify-between text-xs">
+            {/* Router status */}
+            <div className="mt-3 pt-3 border-t border-[var(--edge)] flex items-center justify-between text-xs flex-wrap gap-2">
               <div className="flex items-center gap-1.5 text-[var(--text-2)]">
                 <Router size={13} className="text-[var(--accent-2)]" />
                 <span>Router: ({activeRouter.x}, {activeRouter.y})</span>
@@ -451,7 +391,7 @@ export default function FloorPlans() {
                   variant="ghost"
                   onClick={() => {
                     setMode('router')
-                    toast('Click anywhere on canvas to place router.', 'info')
+                    toast('Tap the canvas to place the router.', 'info')
                   }}
                 >
                   Move
@@ -473,12 +413,6 @@ export default function FloorPlans() {
           </GlassCard>
         </div>
       </div>
-
-      <CameraScannerModal
-        open={cameraOpen}
-        onClose={() => setCameraOpen(false)}
-        onAddRoom={handleCameraAddRoom}
-      />
 
       <ConfirmDialog
         open={confirmReset}

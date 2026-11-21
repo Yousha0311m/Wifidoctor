@@ -1,10 +1,9 @@
-// FloorMap.tsx | SignalFLoor | Interactive Konva floorplan with live operator navigation vector & laser distance ruler
+// FloorMap.tsx | SignalFLoor | Read-only Konva floorplan: heatmap, scan points, spots, markers, tap-to-pick (touch friendly)
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Stage, Layer, Rect, Text, Line, Circle, Group, Wedge, Image as KonvaImage } from 'react-konva'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { Stage, Layer, Rect, Text, Line, Circle, Group, Image as KonvaImage } from 'react-konva'
 import type Konva from 'konva'
-import type { Room, RulerMeasurement, ScanPoint } from '@/types'
-import { measureSpan } from '@/lib/analytics'
+import type { Room, ScanPoint } from '@/types'
 import { CANVAS_W, CANVAS_H, clamp } from '@/lib/floor'
 import { signalLevel } from '@/lib/signal'
 import { renderHeatCanvas, type HeatGrid } from '@/lib/heatmap'
@@ -18,8 +17,6 @@ export interface Marker {
   kind: 'dead' | 'extender'
 }
 
-export type FloorMapTool = 'scan' | 'operator' | 'ruler'
-
 interface Props {
   rooms: Room[]
   points: ScanPoint[]
@@ -32,13 +29,7 @@ interface Props {
   markers?: Marker[]
   showPoints?: boolean
   showRouter?: boolean
-  operator?: { x: number; y: number; heading: number } | null
-  navTarget?: { x: number; y: number; label?: string } | null
-  ruler?: RulerMeasurement | null
-  toolMode?: FloorMapTool
   onTap?: (x: number, y: number) => void
-  onOperatorMove?: (x: number, y: number) => void
-  onRulerChange?: (ruler: RulerMeasurement | null) => void
 }
 
 export default function FloorMap({
@@ -53,13 +44,7 @@ export default function FloorMap({
   markers,
   showPoints = true,
   showRouter = true,
-  operator,
-  navTarget,
-  ruler,
-  toolMode = 'scan',
   onTap,
-  onOperatorMove,
-  onRulerChange,
 }: Props) {
   const c = useCanvasColors()
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -67,13 +52,11 @@ export default function FloorMap({
   const [width, setWidth] = useState(CANVAS_W)
   const scale = width / CANVAS_W
 
-  const rulerDragRef = useRef<{ x1: number; y1: number; awaitingSecondTap: boolean; active: boolean } | null>(null)
-
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
     const ro = new ResizeObserver(([entry]) => {
-      setWidth(Math.max(320, Math.floor(entry.contentRect.width)))
+      setWidth(Math.max(200, Math.floor(entry.contentRect.width)))
     })
     ro.observe(el)
     return () => ro.disconnect()
@@ -84,99 +67,50 @@ export default function FloorMap({
     [heat, c.weak, c.fair, c.strong],
   )
 
-  const getPos = () => {
-    const p = stageRef.current?.getRelativePointerPosition()
-    if (!p) return null
-    return {
-      x: Math.round(clamp(p.x, 0, CANVAS_W)),
-      y: Math.round(clamp(p.y, 0, CANVAS_H)),
-    }
+  // Tap detection with plain pointer events: a press that barely moves and ends quickly counts as a tap.
+  // Scrolling the page with a finger starts a scroll gesture (pointercancel), so it never registers as a tap.
+  const downRef = useRef<{ id: number; cx: number; cy: number; t: number } | null>(null)
+
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return
+    downRef.current = { id: e.pointerId, cx: e.clientX, cy: e.clientY, t: performance.now() }
   }
 
-  const handleStageDown = () => {
-    const p = getPos()
-    if (!p) return
-
-    if (toolMode === 'ruler' && onRulerChange) {
-      const cur = rulerDragRef.current
-      if (cur?.awaitingSecondTap) {
-        onRulerChange({ x1: cur.x1, y1: cur.y1, x2: p.x, y2: p.y })
-        rulerDragRef.current = null
-        return
-      }
-      rulerDragRef.current = { x1: p.x, y1: p.y, awaitingSecondTap: false, active: true }
-      onRulerChange({ x1: p.x, y1: p.y, x2: p.x, y2: p.y })
-      return
-    }
-
-    if (toolMode === 'operator' && onOperatorMove) {
-      onOperatorMove(p.x, p.y)
-      return
-    }
-
-    if (onTap) {
-      onTap(p.x, p.y)
-    }
-  }
-
-  const handleStageMove = () => {
-    if (toolMode !== 'ruler' || !onRulerChange) return
-    const cur = rulerDragRef.current
-    if (!cur || (!cur.active && !cur.awaitingSecondTap)) return
-    const p = getPos()
-    if (!p) return
-    onRulerChange({ x1: cur.x1, y1: cur.y1, x2: p.x, y2: p.y })
-  }
-
-  const handleStageUp = () => {
-    if (toolMode !== 'ruler') return
-    const cur = rulerDragRef.current
-    if (!cur || !cur.active) return
-    const p = getPos()
-    if (!p) {
-      rulerDragRef.current = null
-      return
-    }
-    const moved = Math.hypot(p.x - cur.x1, p.y - cur.y1)
-    if (moved < 6) {
-      rulerDragRef.current = { x1: cur.x1, y1: cur.y1, awaitingSecondTap: true, active: false }
-    } else {
-      rulerDragRef.current = null
-    }
+  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = downRef.current
+    downRef.current = null
+    if (!d || d.id !== e.pointerId || !onTap) return
+    if (Math.hypot(e.clientX - d.cx, e.clientY - d.cy) > 10 || performance.now() - d.t > 600) return
+    const box = e.currentTarget.getBoundingClientRect()
+    onTap(
+      Math.round(clamp((e.clientX - box.left) / scale, 0, CANVAS_W)),
+      Math.round(clamp((e.clientY - box.top) / scale, 0, CANVAS_H)),
+    )
   }
 
   const vLines = Array.from({ length: CANVAS_W / 50 + 1 }, (_, i) => i * 50)
   const hLines = Array.from({ length: CANVAS_H / 50 + 1 }, (_, i) => i * 50)
   const last = points[points.length - 1]
 
-  const activeTarget = navTarget ?? pending ?? null
-  const navMetrics = useMemo(() => {
-    if (!operator || !activeTarget) return null
-    return measureSpan(operator.x, operator.y, activeTarget.x, activeTarget.y, rooms)
-  }, [operator, activeTarget, rooms])
-
-  const rulerMetrics = useMemo(() => {
-    if (!ruler) return null
-    if (Math.hypot(ruler.x2 - ruler.x1, ruler.y2 - ruler.y1) < 4) return null
-    return measureSpan(ruler.x1, ruler.y1, ruler.x2, ruler.y2, rooms)
-  }, [ruler, rooms])
-
   return (
-    <div ref={wrapRef} className="canvas-well w-full">
+    <div
+      ref={wrapRef}
+      className="canvas-well w-full"
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        downRef.current = null
+      }}
+    >
       <Stage
         ref={stageRef}
         width={width}
         height={CANVAS_H * scale}
         scale={{ x: scale, y: scale }}
-        onMouseDown={handleStageDown}
-        onTouchStart={handleStageDown}
-        onMouseMove={handleStageMove}
-        onTouchMove={handleStageMove}
-        onMouseUp={handleStageUp}
-        onTouchEnd={handleStageUp}
-        style={{ cursor: onTap || toolMode !== 'scan' ? 'crosshair' : 'default' }}
+        listening={false}
+        style={{ cursor: onTap ? 'crosshair' : 'default' }}
       >
-        {/* 1. coordinate grid + meter markers + room fills */}
+        {/* 1. coordinate grid + room fills */}
         <Layer listening={false}>
           {vLines.map(x => (
             <Line key={`v${x}`} points={[x, 0, x, CANVAS_H]} stroke={c.grid} strokeWidth={1} />
@@ -185,20 +119,6 @@ export default function FloorMap({
             <Line key={`h${y}`} points={[0, y, CANVAS_W, y]} stroke={c.grid} strokeWidth={1} />
           ))}
           <Rect width={CANVAS_W} height={CANVAS_H} stroke={c.line} strokeWidth={1} />
-          {vLines
-            .filter((_, i) => i > 0 && i < vLines.length - 1 && i % 2 === 0)
-            .map(x => (
-              <Text
-                key={`mx${x}`}
-                x={x + 4}
-                y={4}
-                text={`${x / 50}m`}
-                fill={c.muted}
-                opacity={0.45}
-                fontSize={9}
-                fontFamily="Cascadia Mono, Consolas, ui-monospace, monospace"
-              />
-            ))}
           {rooms.map(r => (
             <Rect key={r.id} x={r.x} y={r.y} width={r.w} height={r.h} fill={c['panel-2']} />
           ))}
@@ -219,7 +139,7 @@ export default function FloorMap({
           </Layer>
         )}
 
-        {/* 3. walls, labels, router rings, scan points, wayfinding & ruler */}
+        {/* 3. walls, labels, router rings, scan points, markers */}
         <Layer listening={false}>
           {rooms.map(r => (
             <Rect
@@ -233,9 +153,7 @@ export default function FloorMap({
             />
           ))}
           {rooms.map(r => {
-            const labelText = r.w >= 145
-              ? `${r.name} · ${(r.w / 50).toFixed(1)}×${(r.h / 50).toFixed(1)}m`
-              : r.name
+            const labelText = r.name
             const pillW = Math.max(44, Math.min(r.w - 16, Math.round(labelText.length * 6.9 + 14)))
             return (
               <Group key={`t${r.id}`} x={r.x} y={r.y}>
@@ -336,128 +254,6 @@ export default function FloorMap({
               <Line points={[0, -28, 0, -10]} stroke={c.accent} strokeWidth={1.2} />
               <Line points={[0, 10, 0, 28]} stroke={c.accent} strokeWidth={1.2} />
               <Circle radius={3.5} fill={c.accent} />
-            </Group>
-          )}
-
-          {/* Wayfinding guidance path from operator to target */}
-          {operator && activeTarget && navMetrics && navMetrics.px > 4 && (
-            <Group>
-              <Line
-                points={[operator.x, operator.y, activeTarget.x, activeTarget.y]}
-                stroke={navMetrics.meters <= 0.65 ? c.strong : c.accent}
-                strokeWidth={2.4}
-                dash={[8, 6]}
-                opacity={0.92}
-              />
-              {(() => {
-                const mx = (operator.x + activeTarget.x) / 2
-                const my = (operator.y + activeTarget.y) / 2
-                const arrived = navMetrics.meters <= 0.65
-                const tag = arrived
-                  ? 'ARRIVED · SCAN READY'
-                  : `${navMetrics.meters.toFixed(1)}m · ${navMetrics.steps} step${navMetrics.steps === 1 ? '' : 's'} · ${navMetrics.cardinal}`
-                const pillW = Math.round(tag.length * 6.7 + 16)
-                return (
-                  <Group x={clamp(mx - pillW / 2, 8, CANVAS_W - pillW - 8)} y={clamp(my - 12, 8, CANVAS_H - 28)}>
-                    <Rect
-                      width={pillW}
-                      height={22}
-                      cornerRadius={7}
-                      fill={c.bg}
-                      stroke={arrived ? c.strong : c.accent}
-                      strokeWidth={1.2}
-                      opacity={0.92}
-                    />
-                    <Text
-                      x={8}
-                      y={5}
-                      text={tag}
-                      fill={arrived ? c.strong : c.ink}
-                      fontSize={10.5}
-                      fontStyle="bold"
-                      fontFamily="Cascadia Mono, Consolas, ui-monospace, monospace"
-                    />
-                  </Group>
-                )
-              })()}
-            </Group>
-          )}
-
-          {/* Live operator position & directional FOV cone */}
-          {operator && (
-            <Group x={operator.x} y={operator.y}>
-              <Wedge
-                radius={42}
-                angle={54}
-                rotation={operator.heading - 90 - 27}
-                fill={c['accent-2']}
-                opacity={0.22}
-              />
-              <Circle radius={18} stroke={c.strong} strokeWidth={1.2} dash={[3, 3]} opacity={0.7} />
-              <Circle radius={9} fill={c.strong} stroke={c.bg} strokeWidth={2.4} />
-              <Rect
-                x={-20}
-                y={13}
-                width={40}
-                height={17}
-                cornerRadius={5}
-                fill={c.bg}
-                stroke={c.strong}
-                strokeWidth={1}
-                opacity={0.9}
-              />
-              <Text
-                x={-20}
-                y={16}
-                width={40}
-                align="center"
-                text="YOU"
-                fill={c.strong}
-                fontSize={10}
-                fontStyle="bold"
-                fontFamily="Cascadia Mono, Consolas, ui-monospace, monospace"
-              />
-            </Group>
-          )}
-
-          {/* Interactive laser distance & wall-loss ruler */}
-          {ruler && rulerMetrics && (
-            <Group>
-              <Line
-                points={[ruler.x1, ruler.y1, ruler.x2, ruler.y2]}
-                stroke={c.fair}
-                strokeWidth={2.4}
-              />
-              <Circle x={ruler.x1} y={ruler.y1} radius={6} fill={c.bg} stroke={c.fair} strokeWidth={2.2} />
-              <Circle x={ruler.x2} y={ruler.y2} radius={6} fill={c.bg} stroke={c.fair} strokeWidth={2.2} />
-              {(() => {
-                const mx = (ruler.x1 + ruler.x2) / 2
-                const my = (ruler.y1 + ruler.y2) / 2
-                const txt = `${rulerMetrics.meters.toFixed(2)}m (${rulerMetrics.steps} steps) · ${rulerMetrics.wallsCrossed} wall${rulerMetrics.wallsCrossed === 1 ? '' : 's'} · -${rulerMetrics.estLossDb}dB`
-                const pillW = Math.round(txt.length * 6.5 + 16)
-                return (
-                  <Group x={clamp(mx - pillW / 2, 8, CANVAS_W - pillW - 8)} y={clamp(my - 28, 8, CANVAS_H - 28)}>
-                    <Rect
-                      width={pillW}
-                      height={22}
-                      cornerRadius={7}
-                      fill={c.bg}
-                      stroke={c.fair}
-                      strokeWidth={1.3}
-                      opacity={0.95}
-                    />
-                    <Text
-                      x={8}
-                      y={5}
-                      text={txt}
-                      fill={c.fair}
-                      fontSize={10.5}
-                      fontStyle="bold"
-                      fontFamily="Cascadia Mono, Consolas, ui-monospace, monospace"
-                    />
-                  </Group>
-                )
-              })()}
             </Group>
           )}
 

@@ -1300,3 +1300,68 @@
     box-shadow: 0 0 10px rgba(167, 139, 250, 0.8);
   }
 }
+/* ==========================================================================
+   MOBILE (<= 768px): sidebar becomes a floating bottom tab bar
+   ========================================================================== */
+@layer components {
+  @media (max-width: 768px) {
+    :root { --titlebar: 48px; --tabbar: 58px; }
+
+    .titlebar { padding: 0 10px; gap: 8px; }
+    .tb-sub { display: none; }
+    .tb-right { gap: 6px; }
+    .tb-pill { height: 34px; padding: 0 10px; }
+    .tb-pill .kbd { display: none; }
+
+    .main { padding: 8px 10px calc(var(--tabbar) + 28px); }
+    .view-head h1 { font-size: 21px; }
+    .panel { padding: 14px; }
+
+    .shell .sidebar {
+      position: fixed;
+      inset: auto 8px calc(8px + env(safe-area-inset-bottom)) 8px;
+      width: auto;
+      height: var(--tabbar);
+      margin: 0;
+      padding: 5px;
+      flex-direction: row;
+      border-radius: 18px;
+      z-index: 30;
+    }
+    .sidebar > .eyebrow,
+    .side-foot,
+    .nav-indicator { display: none; }
+
+    .nav { flex-direction: row; width: 100%; gap: 2px; }
+    .nav-item {
+      flex: 1;
+      height: 100%;
+      border-radius: 13px;
+      border: 1px solid transparent;
+    }
+    .nav-item.active {
+      background: var(--glass-3);
+      border-color: var(--edge-strong);
+      box-shadow: var(--rim);
+    }
+    [data-ui-style="neumorphism"] .shell .nav-item.active {
+      background: var(--bg);
+      border-color: transparent;
+      box-shadow: var(--neu-in);
+    }
+
+    .btn { height: 42px; }
+    .btn.sm { height: 36px; }
+    .input, .select { height: 42px; font-size: 16px; }
+
+    .modal-backdrop { padding: 8px; }
+    .modal { max-height: calc(100dvh - 16px); }
+
+    .toasts { left: 10px; right: 10px; bottom: calc(var(--tabbar) + 24px); align-items: stretch; }
+    .toast { max-width: none; }
+  }
+
+  @media (max-width: 480px) {
+    .tb-title { display: none; }
+  }
+}

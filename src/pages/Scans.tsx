@@ -15,7 +15,6 @@ import type { ScanPoint } from '@/types'
 
 const SOURCE_LABEL: Record<string, string> = {
   simulator: 'Simulator',
-  'host-wifi': 'Host Wi-Fi',
   esp32: 'ESP32',
 }
 
@@ -73,8 +72,7 @@ export default function Scans() {
         await postScan(pending.x, pending.y)
         // WS listener above clears pending + scanning when the result arrives
       } else {
-        // Simulator or Host Wi-Fi: simulateScan handles both synchronously
-        const preferLiveHost = settings.scanSource === 'host-wifi'
+        // Simulator
         const reading = await simulateScan(
           pending.x,
           pending.y,
@@ -82,7 +80,6 @@ export default function Scans() {
           550,
           settings.routerPos,
           settings.espSsid,
-          preferLiveHost,
         )
         addPoint({
           id: Date.now(),
@@ -126,14 +123,14 @@ export default function Scans() {
   }
 
   return (
-    <div className="grid grid-cols-[1fr_320px] gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
       {/* map */}
-      <div className="rounded-lg border border-line bg-panel p-4">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="rounded-lg border border-line bg-panel p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-4">
           <button
             onClick={scan}
             disabled={!pending || scanning}
-            className="h-9 px-3 rounded-md bg-accent text-bg text-sm font-medium flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-10 sm:h-9 px-4 sm:px-3 rounded-md bg-accent text-bg text-sm font-medium flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Crosshair size={15} />
             {scanning ? 'Scanning…' : 'Scan here'}
@@ -147,7 +144,7 @@ export default function Scans() {
               'Tap a numbered spot, or anywhere inside a room'
             )}
           </p>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="sm:ml-auto flex items-center gap-3">
             <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-1 rounded border border-line text-muted">
               {SOURCE_LABEL[settings.scanSource] ?? settings.scanSource}
             </span>
@@ -165,7 +162,7 @@ export default function Scans() {
         />
       </div>
 
-      {/* right rail — unchanged from your original */}
+      {/* right rail */}
       <div className="flex flex-col gap-4">
         <div className="rounded-lg border border-line bg-panel p-4">
           <div className="flex items-center justify-between mb-2">
@@ -200,7 +197,7 @@ export default function Scans() {
           {next ? (
             <button
               onClick={() => setPending({ x: next.x, y: next.y })}
-              className="h-9 w-full rounded-md border border-line text-sm flex items-center justify-center gap-2 hover:bg-panel-2"
+              className="h-10 sm:h-9 w-full rounded-md border border-line text-sm flex items-center justify-center gap-2 hover:bg-panel-2"
             >
               <MapPin size={15} />
               Next: #{spots.indexOf(next) + 1} · {next.roomName}

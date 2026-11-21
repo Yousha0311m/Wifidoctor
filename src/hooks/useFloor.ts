@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Room } from '@/types'
+import { newId } from '@/lib/id'
 import { ROOMS_EVENT, ROOMS_KEY, writeRooms } from '@/lib/workspace'
 
 function load(): Room[] {
@@ -41,7 +42,7 @@ export function useFloor() {
   }, [])
 
   const addRoom = useCallback((rect: Omit<Room, 'id' | 'name'> & { name?: string }) => {
-    const id = crypto.randomUUID()
+    const id = newId()
     setRooms(rs => [...rs, { id, name: rect.name?.trim() || `Room ${rs.length + 1}`, x: rect.x, y: rect.y, w: rect.w, h: rect.h }])
     return id
   }, [setRooms])

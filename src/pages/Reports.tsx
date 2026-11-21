@@ -233,7 +233,7 @@ export default function Reports() {
           )}
 
           <p className="text-[11px] text-[var(--text-3)] border-t border-[var(--edge)] pt-3 mt-3">
-            Click a recommendation card to highlight its marker on the map.
+            Tap a recommendation to highlight its marker on the map.
           </p>
         </GlassCard>
       </div>
@@ -283,14 +283,14 @@ export default function Reports() {
 
       <GlassCard eyebrow="Matrix" title="Room Telemetry Summary">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[340px]">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-[var(--text-3)] border-b border-[var(--edge)]">
                 <th className="font-semibold pb-2.5">Room</th>
                 <th className="font-semibold pb-2.5 text-right">Points</th>
                 <th className="font-semibold pb-2.5 text-right">Avg RSSI</th>
-                <th className="font-semibold pb-2.5 text-right">Weakest</th>
-                <th className="font-semibold pb-2.5 w-44 pl-6">Signal Bar</th>
+                <th className="font-semibold pb-2.5 text-right hidden sm:table-cell">Weakest</th>
+                <th className="font-semibold pb-2.5 w-44 pl-6 hidden md:table-cell">Signal Bar</th>
                 <th className="font-semibold pb-2.5 text-right">Coverage</th>
                 <th className="font-semibold pb-2.5 text-right">Status</th>
               </tr>
@@ -298,7 +298,7 @@ export default function Reports() {
             <tbody>
               {rows.map(r => (
                 <tr key={r.room.id} className="border-t border-[var(--edge)] hover:bg-[var(--glass-1)]">
-                  <td className="py-2.5 font-semibold text-[var(--text)]">{r.room.name}</td>
+                  <td className="py-2.5 pr-3 font-semibold text-[var(--text)]">{r.room.name}</td>
                   <td className="py-2.5 text-right font-mono text-xs text-[var(--text-3)]">{r.count}</td>
                   {r.avg === null ? (
                     <td colSpan={5} className="py-2.5 text-right text-xs text-[var(--text-3)]">
@@ -307,8 +307,8 @@ export default function Reports() {
                   ) : (
                     <>
                       <td className="py-2.5 text-right font-mono text-xs text-[var(--text)]">{r.avg} dBm</td>
-                      <td className="py-2.5 text-right font-mono text-xs text-[var(--text-2)]">{r.min} dBm</td>
-                      <td className="py-2.5 pl-6">
+                      <td className="py-2.5 text-right font-mono text-xs text-[var(--text-2)] hidden sm:table-cell">{r.min} dBm</td>
+                      <td className="py-2.5 pl-6 hidden md:table-cell">
                         <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
                           <div
                             className={`h-full rounded-full ${levelBg[signalLevel(r.avg)]}`}

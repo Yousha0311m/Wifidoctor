@@ -1,7 +1,10 @@
-// Thin client for the Phase A backend. No auth, no retries — just the
-// minimum to trigger a scan and receive results via WebSocket.
+// Thin client for the backend. No auth, no retries: just enough to trigger a
+// scan and receive results via WebSocket.
+//
+// The backend host follows whatever host served the page, so the dashboard
+// also works from a phone (where "localhost" would point at the phone itself).
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:8000`
 
 export async function postScan(x: number, y: number): Promise<{ scan_id: string; status: string }> {
   const res = await fetch(`${API_BASE}/scan`, {

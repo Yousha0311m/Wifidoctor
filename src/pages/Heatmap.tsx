@@ -1,14 +1,14 @@
-// Heatmap.tsx | SignalFLoor | Streamlined IDW attenuation heatmap view with opacity, unified layer toggles & laser ruler
+// Heatmap.tsx | SignalFLoor | IDW signal heatmap with opacity, layer toggles & tap-to-probe (mobile friendly)
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Crosshair, Database, Eye, EyeOff, Flame, Router, Ruler } from 'lucide-react'
+import { Crosshair, Database, Eye, EyeOff, Flame, Router } from 'lucide-react'
 import FloorMap, { type Marker } from '@/components/floorplan/FloorMap'
 import { Badge, Button, GlassCard } from '@/components/ui/Kit'
 import { useFloor } from '@/hooks/useFloor'
 import { useScan } from '@/hooks/useScan'
 import { useSettings } from '@/hooks/useSettings'
-import { inRoom, measureSpan } from '@/lib/analytics'
+import { inRoom } from '@/lib/analytics'
 import { computeHeatGrid, valueAt } from '@/lib/heatmap'
 import { findDeadZones, recommend } from '@/lib/recommend'
 import { getRouterPos } from '@/lib/scanner'
@@ -16,7 +16,6 @@ import { levelText, rssiToPercent, signalLevel } from '@/lib/signal'
 import { sound } from '@/lib/sounds'
 import { toast } from '@/lib/toast'
 import { loadDemoWorkspace } from '@/lib/workspace'
-import type { RulerMeasurement } from '@/types'
 
 export default function Heatmap() {
   const navigate = useNavigate()
@@ -29,8 +28,6 @@ export default function Heatmap() {
   const [showRouter, setShowRouter] = useState(true)
   const [heatOpacity, setHeatOpacity] = useState(0.75)
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null)
-  const [rulerMode, setRulerMode] = useState(false)
-  const [ruler, setRuler] = useState<RulerMeasurement | null>(null)
 
   const heat = useMemo(() => computeHeatGrid(rooms, points), [rooms, points])
   const router = useMemo(() => getRouterPos(rooms, settings.routerPos), [rooms, settings.routerPos])
@@ -47,10 +44,6 @@ export default function Heatmap() {
 
   const probeValue = heat && probe ? valueAt(heat, probe.x, probe.y) : null
   const probeRoom = probe ? rooms.find(r => inRoom(probe, r))?.name ?? 'Unmapped' : null
-  const rulerMetrics = useMemo(() => {
-    if (!ruler || Math.hypot(ruler.x2 - ruler.x1, ruler.y2 - ruler.y1) < 4) return null
-    return measureSpan(ruler.x1, ruler.y1, ruler.x2, ruler.y2, rooms)
-  }, [ruler, rooms])
 
   if (rooms.length === 0 || points.length === 0) {
     const noRooms = rooms.length === 0
@@ -100,7 +93,7 @@ export default function Heatmap() {
       <div className="view-head">
         <div>
           <h1>Heatmap</h1>
-          <p>Continuous IDW signal strength map and tap-to-probe inspector.</p>
+          <p>Signal strength across your floor plan. Tap a room to probe it.</p>
         </div>
       </div>
 
@@ -109,13 +102,13 @@ export default function Heatmap() {
           <div className="flex items-center gap-2 text-xs text-[var(--text-2)]">
             <span className="font-mono">-85</span>
             <div
-              className="h-2 w-40 rounded-full"
+              className="h-2 w-28 sm:w-40 rounded-full"
               style={{ background: 'linear-gradient(to right, var(--weak), var(--fair), var(--strong))' }}
             />
             <span className="font-mono">-50 dBm</span>
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-[var(--text-2)] ml-2">
+          <label className="flex items-center gap-2 text-xs text-[var(--text-2)] sm:ml-2">
             <span>Opacity</span>
             <input
               type="range"
@@ -124,69 +117,32 @@ export default function Heatmap() {
               step={0.05}
               value={heatOpacity}
               onChange={e => setHeatOpacity(parseFloat(e.target.value))}
-              className="w-24 accent-white"
+              className="w-28 accent-white"
             />
           </label>
 
-          <div className="ml-auto flex items-center gap-2 flex-wrap">
-            <Button
-              size="sm"
-              variant={rulerMode ? 'primary' : 'default'}
-              onClick={() => setRulerMode(r => !r)}
-            >
-              <Ruler size={13} />
-              {rulerMode ? 'Measuring' : 'Laser Ruler'}
-            </Button>
-            {ruler && (
-              <Button size="sm" variant="ghost" onClick={() => setRuler(null)}>
-                Clear Ruler
-              </Button>
-            )}
-
-            {/* Unified Layer Visibility Group */}
-            <div className="flex items-center gap-0.5 border border-[var(--edge)] rounded-[10px] p-0.5 bg-[var(--panel)]">
+          {/* Layer visibility */}
+          <div className="sm:ml-auto flex items-center gap-0.5 border border-[var(--edge)] rounded-[10px] p-0.5 bg-[var(--panel)]">
+            {[
+              { label: 'Points', on: showPoints, set: setShowPoints, icon: showPoints ? <Eye size={13} /> : <EyeOff size={13} /> },
+              { label: 'Zones', on: showOverlays, set: setShowOverlays, icon: <Crosshair size={13} /> },
+              { label: 'Router', on: showRouter, set: setShowRouter, icon: <Router size={13} /> },
+            ].map(t => (
               <button
+                key={t.label}
                 type="button"
-                onClick={() => setShowPoints(s => !s)}
-                title="Toggle Scan Points"
+                onClick={() => t.set(v => !v)}
+                aria-pressed={t.on}
                 style={{
-                  background: showPoints ? 'var(--glass-3)' : 'transparent',
-                  color: showPoints ? 'var(--text)' : 'var(--text-3)',
+                  background: t.on ? 'var(--glass-3)' : 'transparent',
+                  color: t.on ? 'var(--text)' : 'var(--text-3)',
                 }}
-                className="px-2.5 py-1 text-xs rounded-[7px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-3 h-9 sm:h-7 text-xs rounded-[7px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
               >
-                {showPoints ? <Eye size={12} /> : <EyeOff size={12} />}
-                <span>Points</span>
+                {t.icon}
+                <span>{t.label}</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => setShowOverlays(s => !s)}
-                title="Toggle Dead Zones & Extender Spots"
-                style={{
-                  background: showOverlays ? 'var(--glass-3)' : 'transparent',
-                  color: showOverlays ? 'var(--text)' : 'var(--text-3)',
-                }}
-                className="px-2.5 py-1 text-xs rounded-[7px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Crosshair size={12} />
-                <span>Zones</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowRouter(s => !s)}
-                title="Toggle Router Pin"
-                style={{
-                  background: showRouter ? 'var(--glass-3)' : 'transparent',
-                  color: showRouter ? 'var(--text)' : 'var(--text-3)',
-                }}
-                className="px-2.5 py-1 text-xs rounded-[7px] font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Router size={12} />
-                <span>Router</span>
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -203,9 +159,6 @@ export default function Heatmap() {
             showRouter={showRouter}
             pending={probe}
             router={router}
-            ruler={ruler}
-            toolMode={rulerMode ? 'ruler' : 'scan'}
-            onRulerChange={setRuler}
             onTap={(x, y) => {
               if (rooms.some(r => inRoom({ x, y }, r))) {
                 sound.tick()
@@ -216,20 +169,6 @@ export default function Heatmap() {
         </GlassCard>
 
         <div className="flex flex-col gap-3.5">
-          {rulerMetrics && (
-            <GlassCard eyebrow="Laser Ruler" title="Measured Span" icon={<Ruler size={16} />}>
-              <dl className="grid grid-cols-[1fr_auto] gap-y-2 text-xs">
-                <dt className="text-[var(--text-3)]">Distance</dt>
-                <dd className="font-mono font-semibold text-[var(--text)]">{rulerMetrics.meters.toFixed(2)} m</dd>
-                <dt className="text-[var(--text-3)]">Walking steps (~0.75m)</dt>
-                <dd className="font-mono text-[var(--text)]">{rulerMetrics.steps} steps ({rulerMetrics.cardinal})</dd>
-                <dt className="text-[var(--text-3)]">Walls crossed</dt>
-                <dd className="font-mono text-[var(--text)]">{rulerMetrics.wallsCrossed}</dd>
-                <dt className="text-[var(--text-3)]">Est. RF attenuation</dt>
-                <dd className="font-mono text-[var(--warn-text)]">-{rulerMetrics.estLossDb} dB</dd>
-              </dl>
-            </GlassCard>
-          )}
           <GlassCard eyebrow="Probe" title="Estimated at Point" icon={<Crosshair size={16} />}>
             {probe && probeValue !== null ? (
               <div className="flex flex-col gap-2">

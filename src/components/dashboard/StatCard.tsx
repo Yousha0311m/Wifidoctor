@@ -32,7 +32,7 @@ export default function StatCard({ label, value, unit, sub, icon, tone = 'neutra
           </span>
         )}
       </div>
-      <p className={`text-[26px] leading-none font-bold tracking-tight font-mono ${TONE_VAL[tone]}`}>
+      <p className={`text-[22px] sm:text-[26px] leading-tight font-bold tracking-tight font-mono break-words ${TONE_VAL[tone]}`}>
         {value}
         {unit && <span className="text-xs text-[var(--text-3)] font-normal ml-1">{unit}</span>}
       </p>
