@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Stage, Layer, Rect, Text, Line, Circle, Group, Image as KonvaImage } from 'react-konva'
-import type Konva from 'konva'
+import Konva from 'konva'
 import type { Room, ScanPoint } from '@/types'
 import { CANVAS_W, CANVAS_H, clamp } from '@/lib/floor'
 import { signalLevel } from '@/lib/signal'
@@ -51,6 +51,27 @@ export default function FloorMap({
   const stageRef = useRef<Konva.Stage>(null)
   const [width, setWidth] = useState(CANVAS_W)
   const scale = width / CANVAS_W
+
+  // Pulsing glow rings behind the scan points. One animation loop moves every ring, and it
+  // only touches the ring layer, so the heatmap underneath is never redrawn.
+  const pulseLayerRef = useRef<Konva.Layer>(null)
+  useEffect(() => {
+    const layer = pulseLayerRef.current
+    if (!layer || !showPoints) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const anim = new Konva.Animation(frame => {
+      const t = (frame?.time ?? 0) / 2200
+      layer.getChildren().forEach((node, i) => {
+        const phase = (t + (i % 7) * 0.13) % 1 // spread the rings so they do not all beat together
+        node.scale({ x: 1 + phase * 1.9, y: 1 + phase * 1.9 })
+        node.opacity(0.55 * (1 - phase))
+      })
+    }, layer)
+    anim.start()
+    return () => {
+      anim.stop()
+    }
+  }, [showPoints, points.length])
 
   useEffect(() => {
     const el = wrapRef.current
@@ -239,6 +260,9 @@ export default function FloorMap({
                 fill={c[signalLevel(p.rssi)]}
                 stroke={c.bg}
                 strokeWidth={2}
+                shadowColor={c[signalLevel(p.rssi)]}
+                shadowBlur={14}
+                shadowOpacity={0.9}
               />
             ))}
 
@@ -277,6 +301,22 @@ export default function FloorMap({
               />
             </Group>
           ))}
+        </Layer>
+
+        {/* 4. pulsing rings (animated, drawn above the points, never intercepts taps) */}
+        <Layer ref={pulseLayerRef} listening={false}>
+          {showPoints &&
+            points.map(p => (
+              <Circle
+                key={`pulse-${p.id}`}
+                x={p.x}
+                y={p.y}
+                radius={7}
+                stroke={c[signalLevel(p.rssi)]}
+                strokeWidth={1.6}
+                opacity={0.4}
+              />
+            ))}
         </Layer>
       </Stage>
     </div>

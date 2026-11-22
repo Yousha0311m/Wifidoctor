@@ -5,7 +5,6 @@ import { NavLink, useLocation } from 'react-router-dom'
 import {
   Database,
   Flame,
-  FileText,
   Gauge,
   LayoutDashboard,
   Map as MapIcon,
@@ -19,7 +18,7 @@ import { sound } from '@/lib/sounds'
 import { toast } from '@/lib/toast'
 import { loadDemoWorkspace } from '@/lib/workspace'
 
-const ROUTES = ['/', '/floor-plans', '/scans', '/heatmap', '/reports', '/utilities'] as const
+const ROUTES = ['/', '/floor-plans', '/scans', '/heatmap', '/utilities'] as const
 
 export default function Sidebar({ onOpenFxStudio }: { onOpenFxStudio: () => void }) {
   const { pathname } = useLocation()
@@ -33,7 +32,6 @@ export default function Sidebar({ onOpenFxStudio }: { onOpenFxStudio: () => void
     { label: 'Floor Plans', to: '/floor-plans', icon: MapIcon, badge: rooms.length || null },
     { label: 'Scans', to: '/scans', icon: Radar, badge: points.length || null },
     { label: 'Heatmap', to: '/heatmap', icon: Flame, badge: null },
-    { label: 'Reports', to: '/reports', icon: FileText, badge: null },
     { label: 'Wi-Fi Utilities', to: '/utilities', icon: Gauge, badge: null },
   ]
 

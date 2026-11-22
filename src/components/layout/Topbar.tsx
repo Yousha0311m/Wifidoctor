@@ -12,8 +12,7 @@ const ROUTE_SUB: Record<string, string> = {
   '/': 'Wi-Fi Telemetry Studio',
   '/floor-plans': 'Spatial Floor Builder',
   '/scans': 'Signal Capture',
-  '/heatmap': 'Signal Heatmap',
-  '/reports': 'Dead-Zone Diagnostics',
+  '/heatmap': 'Coverage & Diagnostics',
   '/utilities': 'Channels & Nearby Networks',
 }
 

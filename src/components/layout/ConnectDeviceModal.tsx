@@ -1,7 +1,7 @@
-// ConnectDeviceModal.tsx | SignalFLoor | Bluetooth link to the ESP32: send Wi-Fi + broker settings, choose scan source
+// ConnectDeviceModal.tsx | Wi-Ma | Bluetooth link to the ESP32: pick a Wi-Fi network, send settings, choose scan source
 
-import { useEffect, useState } from 'react'
-import { Bluetooth, BluetoothConnected, Eye, EyeOff, Send, Unplug } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Bluetooth, BluetoothConnected, Check, Eye, EyeOff, Lock, RefreshCw, Send, Unplug } from 'lucide-react'
 import { Badge, Button, Modal, Switch } from '@/components/ui/Kit'
 import { useHardware } from '@/hooks/useHardware'
 import { useSettings } from '@/hooks/useSettings'
@@ -15,6 +15,12 @@ interface Saved {
   host: string
   port: string
   deviceId: string
+}
+
+interface Net {
+  ssid: string
+  rssi: number
+  secure: boolean
 }
 
 const DEFAULTS: Saved = { ssid: '', host: '', port: '1883', deviceId: 'esp32-01' }
@@ -47,9 +53,50 @@ export default function ConnectDeviceModal({ open, onClose }: { open: boolean; o
   const [busy, setBusy] = useState(false)
   const [log, setLog] = useState<string[]>([])
 
+  const [nets, setNets] = useState<Net[]>([])
+  const [listing, setListing] = useState(false)
+
   const support = hardware.support()
 
-  useEffect(() => hardware.onEvent(e => setLog(l => [...l.slice(-5), describe(e)])), [])
+  useEffect(
+    () =>
+      hardware.onEvent(e => {
+        if (e.evt === 'net') {
+          if (!e.ssid) return
+          const ssid = e.ssid
+          setNets(list => (list.some(n => n.ssid === ssid) ? list : [...list, { ssid, rssi: e.rssi ?? -100, secure: e.sec !== 0 }]))
+          return
+        }
+        if (e.evt === 'net_done') {
+          setListing(false)
+          return
+        }
+        setLog(l => [...l.slice(-5), describe(e)])
+      }),
+    [],
+  )
+
+  // Ask the board for the networks it can hear, so the name can be picked instead of typed
+  const loadNets = useCallback(async () => {
+    setNets([])
+    setListing(true)
+    try {
+      await hardware.requestNetworks()
+    } catch {
+      setListing(false) // older firmware or a dropped link: typing the name still works
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!status.connected) return
+    const id = window.setTimeout(() => void loadNets(), 400)
+    // Older firmware never answers, so do not leave the spinner running forever
+    const stop = window.setTimeout(() => setListing(false), 15000)
+    return () => {
+      window.clearTimeout(id)
+      window.clearTimeout(stop)
+    }
+  }, [status.connected, loadNets])
 
   const patch = (p: Partial<Saved>) => {
     const next = { ...form, ...p }
@@ -139,7 +186,41 @@ export default function ConnectDeviceModal({ open, onClose }: { open: boolean; o
 
       {status.connected && (
         <div className="flex flex-col gap-2.5">
-          <label className="text-xs font-semibold text-[var(--text-2)]">Wi-Fi network (2.4 GHz only)</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-[var(--text-2)]">Wi-Fi network (2.4 GHz only)</label>
+            <button
+              type="button"
+              className="text-xs text-[var(--text-2)] inline-flex items-center gap-1 disabled:opacity-50"
+              onClick={() => void loadNets()}
+              disabled={listing}
+            >
+              <RefreshCw size={12} className={listing ? 'animate-spin' : ''} /> {listing ? 'Looking...' : 'Refresh'}
+            </button>
+          </div>
+          {(nets.length > 0 || listing) && (
+            <div className="flex flex-col gap-1 max-h-44 overflow-y-auto rounded-[12px] border border-[var(--edge)] p-1.5">
+              {nets.length === 0 && <p className="text-xs text-[var(--text-3)] px-2 py-1.5">Listening for networks near the board...</p>}
+              {nets.map(n => {
+                const picked = form.ssid === n.ssid
+                return (
+                  <button
+                    key={n.ssid}
+                    type="button"
+                    onClick={() => patch({ ssid: n.ssid })}
+                    className={`flex items-center justify-between gap-2 rounded-[8px] px-2.5 py-1.5 text-left text-sm ${
+                      picked ? 'bg-[var(--glass-2)] text-[var(--text)]' : 'text-[var(--text-2)]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      {picked ? <Check size={13} /> : n.secure ? <Lock size={12} /> : <span className="w-3" />}
+                      <span className="truncate">{n.ssid}</span>
+                    </span>
+                    <span className="text-xs font-mono text-[var(--text-3)] shrink-0">{n.rssi} dBm</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <input
             className="input"
             value={form.ssid}

@@ -310,6 +310,46 @@
     background: var(--warn);
   }
 
+  /* Signal-level dot: soft glow that breathes, plus a ring that ripples outward */
+  .signal-dot {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 6px 1px var(--dot);
+    animation: signal-glow 2.2s ease-in-out infinite;
+    animation-delay: var(--dot-delay, 0s);
+  }
+  .signal-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--dot);
+    opacity: 0;
+    animation: signal-ripple 2.2s ease-out infinite;
+    animation-delay: var(--dot-delay, 0s);
+  }
+  .signal-dot.strong { --dot: var(--strong); --dot-delay: 0s; }
+  .signal-dot.fair   { --dot: var(--fair);   --dot-delay: 0.35s; }
+  .signal-dot.weak   { --dot: var(--weak);   --dot-delay: 0.7s; }
+
+  @keyframes signal-glow {
+    0%, 100% { box-shadow: 0 0 4px 0 var(--dot); transform: scale(0.92); }
+    50%      { box-shadow: 0 0 12px 3px var(--dot); transform: scale(1.08); }
+  }
+  @keyframes signal-ripple {
+    0%   { transform: scale(1);   opacity: 0.7; }
+    100% { transform: scale(2.6); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .signal-dot, .signal-dot::after { animation: none; }
+    .signal-dot::after { display: none; }
+  }
+
   /* ------------------------------------------------------------ App Shell & Sidebar */
   .shell {
     position: fixed;

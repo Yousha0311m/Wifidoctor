@@ -39,3 +39,6 @@ dist-ssr
 *.sw?
 _backup/
 
+
+# Monitor history written by the backend
+backend/data/

@@ -8,7 +8,6 @@ import {
   Command,
   Database,
   Download,
-  FileText,
   Flame,
   Gauge,
   LayoutDashboard,
@@ -129,8 +128,7 @@ export default function CommandPalette({
       { id: 'nav-dash', title: 'Go to Dashboard', sub: 'Signal telemetry & floor overview', hint: 'Nav', icon: LayoutDashboard, run: () => navigate('/') },
       { id: 'nav-floor', title: 'Go to Floor Plans', sub: 'Draw rooms, resize walls & place router', hint: 'Nav', icon: MapIcon, run: () => navigate('/floor-plans') },
       { id: 'nav-scans', title: 'Go to Scans', sub: 'Capture signal readings at spots on your floor plan', hint: 'Nav', icon: Radar, run: () => navigate('/scans') },
-      { id: 'nav-heat', title: 'Go to Heatmap', sub: 'IDW interpolated signal strength & point probe', hint: 'Nav', icon: Flame, run: () => navigate('/heatmap') },
-      { id: 'nav-rep', title: 'Go to Reports', sub: 'Dead zones, extender placement & charts', hint: 'Nav', icon: FileText, run: () => navigate('/reports') },
+      { id: 'nav-heat', title: 'Go to Heatmap', sub: 'Coverage map, dead zones, extenders & report', hint: 'Nav', icon: Flame, run: () => navigate('/heatmap') },
       { id: 'nav-util', title: 'Go to Wi-Fi Utilities', sub: 'Nearby networks, channel congestion & best channel', hint: 'Tools', icon: Gauge, run: () => navigate('/utilities') },
       {
         id: 'demo',

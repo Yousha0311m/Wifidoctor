@@ -58,10 +58,12 @@ export function Button({
 
 export function BrandMark({ size = 22 }: { size?: number }) {
   return (
-    <img 
+    <img
       className="brand-mark"
-      src="/andrioid-chrome-192x192.png" 
-      alt="icon" 
+      src="/android-chrome-192x192.png"
+      alt="Wi-Ma"
+      width={size}
+      height={size}
     />
   )
 }

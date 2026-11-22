@@ -28,3 +28,31 @@ export interface ScanPoint {
   channel?: number
   networks?: NearbyNetwork[]
 }
+
+// ---- Monitor mode: the always-on ESP32 reports one sample every minute or so ----
+export interface MonitorSample {
+  t: number // epoch ms, stamped by the backend on arrival
+  rssi: number | null // signal to your own router; null = not connected
+  channel: number | null
+  ssid: string
+  gw_ms: number | null // time to reach the router; null = unreachable
+  net_ms: number | null // time to reach the internet; null = unreachable
+  dns_ms: number | null // time to look up a name; null = failed
+  heap?: number | null
+  up?: number | null // board uptime, seconds
+  aps?: number | null // networks heard in the last scan
+  networks?: NearbyNetwork[] // present on samples that included a neighbour scan
+}
+
+export interface MonitorEvent {
+  t: number
+  event: string // "disconnect" | "reconnect"
+  reason?: number | null
+  down_s?: number | null
+}
+
+export interface MonitorState {
+  enabled: boolean
+  interval: number
+  last_seen: number | null
+}

@@ -4,6 +4,8 @@
 //   app -> device  {"cmd":"wifi","ssid":"...","pass":"...","host":"192.168.0.10","port":1883,"id":"esp32-01"}
 //   device -> app  {"evt":"wifi","state":"connecting|connected|failed","ip":"...","reason":"..."}
 //                  {"evt":"mqtt","state":"connected|failed"}
+//   app -> device  {"cmd":"scan"}                      ask for the Wi-Fi networks the board can hear
+//   device -> app  {"evt":"net","ssid":"...","rssi":-50,"sec":1} (one per network) then {"evt":"net_done","count":n}
 export const BLE_SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b'
 export const BLE_CHAR_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8'
 const NAME_PREFIX = 'SignalFloor'
@@ -22,6 +24,10 @@ export interface DeviceEvent {
   state?: string
   ip?: string
   reason?: string
+  ssid?: string
+  rssi?: number
+  sec?: number
+  count?: number
 }
 
 export interface HardwareStatus {
@@ -183,6 +189,11 @@ class HardwareManager {
 
   public provision(cfg: ProvisionConfig) {
     return this.send({ cmd: 'wifi', ssid: cfg.ssid, pass: cfg.pass, host: cfg.host, port: cfg.port, id: cfg.deviceId })
+  }
+
+  /** Ask the board which Wi-Fi networks it can hear. Answers arrive as "net" events, then "net_done". */
+  public requestNetworks() {
+    return this.send({ cmd: 'scan' })
   }
 
   public async disconnect() {

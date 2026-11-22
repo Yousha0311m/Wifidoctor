@@ -226,7 +226,7 @@ export default function FloorPlans() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-3.5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-3.5 items-start">
         <GlassCard
           eyebrow="Canvas"
           title="Spatial Layout Editor"
