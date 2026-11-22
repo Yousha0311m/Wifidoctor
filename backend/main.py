@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 # ---- Config (hardcoded for Phase A; moves to env vars in Phase B) ----
 MQTT_HOST = "192.168.0.122"
+NOT_HEARD_RSSI = -100  # stored when our own network is not heard at a spot
 MQTT_PORT = 1883
 DEVICE_ID = "esp32-01"
 
@@ -96,19 +97,32 @@ async def handle_scan(payload: str) -> None:
         for n in raw_networks
         if isinstance(n, dict) and isinstance(n.get("rssi"), (int, float))
     ]
-    if not networks:
+    # "Your" network is the one the board is joined to; the firmware sends its name.
+    # Map that network, not whichever neighbour happens to be loudest at this spot.
+    own_ssid = data.get("own_ssid") or ""
+    if own_ssid:
+        mine = [n for n in networks if n["ssid"] == own_ssid]
+        if mine:
+            chosen = max(mine, key=lambda n: n["rssi"])
+        else:
+            # Heard everyone except our own network: that spot is effectively dead
+            chosen = {"ssid": own_ssid, "bssid": "", "rssi": NOT_HEARD_RSSI, "channel": None}
+            print(f"[scan] own network {own_ssid!r} not heard here, storing {NOT_HEARD_RSSI} dBm")
+    elif networks:
+        # Older firmware without own_ssid: fall back to the loudest network
+        chosen = max(networks, key=lambda n: n["rssi"])
+    else:
         print("[scan] no usable networks in payload, nothing to store")
         return
 
-    strongest = max(networks, key=lambda n: n["rssi"])
     point = {
         "id": int(datetime.now(timezone.utc).timestamp() * 1000),
         "x": x,
         "y": y,
-        "rssi": strongest["rssi"],
-        "ssid": strongest["ssid"],
-        "bssid": strongest["bssid"],
-        "channel": strongest["channel"],
+        "rssi": chosen["rssi"],
+        "ssid": chosen["ssid"],
+        "bssid": chosen["bssid"],
+        "channel": chosen["channel"],
         "networks": networks,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

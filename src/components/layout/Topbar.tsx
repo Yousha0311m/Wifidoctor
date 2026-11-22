@@ -1,7 +1,6 @@
 // Topbar.tsx | SignalFLoor | Header bar with UI theme pill, command palette, audio & theme toggle
 import { useLocation } from 'react-router-dom'
 import { Bluetooth, BluetoothConnected, Command, Palette, Volume2, VolumeX } from 'lucide-react'
-import { BrandMark } from '@/components/ui/Kit'
 import { useFloor } from '@/hooks/useFloor'
 import { useHardware } from '@/hooks/useHardware'
 import { useScan } from '@/hooks/useScan'
@@ -39,8 +38,8 @@ export default function Topbar({
   return (
     <header className="titlebar">
       <div className="tb-drag">
-        <BrandMark size={22} />
-        <span className="tb-title">SIGNALFLOOR</span>
+        <img src="/android-chrome-192x192.png" height={52} width={52}/>
+        <span className="tb-title">Wifi Mama</span>
         <span className="tb-sub">{ROUTE_SUB[pathname] ?? 'Wi-Fi Telemetry'} · by Geymars</span>
       </div>
 

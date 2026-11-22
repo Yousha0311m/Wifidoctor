@@ -12,6 +12,7 @@ import { AlertTriangle, CheckCircle2, Info, ShieldAlert, X } from 'lucide-react'
 import { sound } from '@/lib/sounds'
 import { subscribeToasts, type ToastItem, type ToastLevel } from '@/lib/toast'
 
+
 type BtnVariant = 'default' | 'primary' | 'danger' | 'ghost'
 type BtnSize = 'sm' | 'md'
 
@@ -57,19 +58,11 @@ export function Button({
 
 export function BrandMark({ size = 22 }: { size?: number }) {
   return (
-    <svg className="brand-mark" width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="sf-silver" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.6" stopColor="#d4d4d8" />
-          <stop offset="1" stopColor="#8e8e96" />
-        </linearGradient>
-      </defs>
-      <rect x="3.5" y="3.5" width="25" height="25" rx="6" stroke="url(#sf-silver)" strokeWidth="2" />
-      <path d="M3.5 16h9v12.5M16 3.5v8.5h12.5" stroke="url(#sf-silver)" strokeWidth="1.6" strokeOpacity="0.65" />
-      <path d="M16.5 21.5a4.5 4.5 0 0 1 4.5-4.5M16.5 25.5a8.5 8.5 0 0 1 8.5-8.5" stroke="url(#sf-silver)" strokeWidth="1.9" strokeLinecap="round" />
-      <circle cx="17" cy="21" r="1.6" fill="url(#sf-silver)" />
-    </svg>
+    <img 
+      className="brand-mark"
+      src="/andrioid-chrome-192x192.png" 
+      alt="icon" 
+    />
   )
 }
 

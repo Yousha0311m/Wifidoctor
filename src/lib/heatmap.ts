@@ -64,10 +64,10 @@ const mix = (a: RGB, b: RGB, t: number): RGB => [
   a[2] + (b[2] - a[2]) * t,
 ]
 
-// red at -85 → amber at -67 → green at -50, smooth in between
+// red at -75 (the dead-zone line) → amber at -67 → green at -50, smooth in between
 function ramp(rssi: number, weak: RGB, fair: RGB, strong: RGB): RGB {
-  if (rssi <= -85) return weak
-  if (rssi <= -67) return mix(weak, fair, (rssi + 85) / 18)
+  if (rssi <= -75) return weak
+  if (rssi <= -67) return mix(weak, fair, (rssi + 75) / 8)
   if (rssi <= -50) return mix(fair, strong, (rssi + 67) / 17)
   return strong
 }
